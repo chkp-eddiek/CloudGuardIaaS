@@ -35,8 +35,7 @@ runs:
       run: |
         mkdir -p test-results
         set +e  # Don't exit on command failure
-        
-        if [[ "${{ inputs.output-parser }}" == "pytest-json" ]]; then
+          if [[ "${{ inputs.output-parser }}" == "pytest-json" ]]; then
           ${{ inputs.test-command }} --json-report --json-report-file=test-results/${{ inputs.test-name }}-report.json
           exit_code=$?
         elif [[ "${{ inputs.output-parser }}" == "shellcheck-xml" ]]; then
@@ -52,7 +51,8 @@ runs:
         if [[ "${{ inputs.continue-on-error }}" == "false" && $exit_code -ne 0 ]]; then
           exit $exit_code
         fi
-          - name: Convert to JUnit XML
+        
+    - name: Convert to JUnit XML
       shell: bash
       run: |
         python3 -u -c "
