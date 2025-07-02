@@ -24,7 +24,7 @@ jobs:
             command: pytest --flakes ./
             parser: pytest-json
             continue-on-error: false
-              - name: pydocstyle
+          - name: pydocstyle
             setup: |
               pip install pytest pytest-docstyle pytest-json-report
             command: pytest --docstyle --docstyle-select=D101,D102,D103,D105,D106,D207,D208,D209,D210,D211,D213,D214,D215,D300,D414,D417,D418,D419 ./
