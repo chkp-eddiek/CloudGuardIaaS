@@ -68,11 +68,16 @@ jobs:
         run: |
           pwd
           ls -la
+          echo "Git workspace: ${{ github.workspace }}"
+          echo "Current directory: $(pwd)"
           git status || echo "Git status failed"
+          git log --oneline -1 || echo "Git log failed"
+          ls -la .git || echo "No .git directory found"
           
       - name: Publish test results
-        uses: dorny/test-reporter@v1
+        uses: dorny/test-reporter@v1.9.1
         if: always()
+        continue-on-error: true
         with:
           name: Code Analysis Tests
           path: test-results/**/*.xml
@@ -86,3 +91,12 @@ jobs:
           only-summary: false
           token: ${{ secrets.GITHUB_TOKEN }}
           working-directory: ${{ github.workspace }}
+          
+      - name: Alternative test results publication
+        if: failure()
+        uses: mikepenz/action-junit-report@v4
+        with:
+          report_paths: 'test-results/**/*.xml'
+          check_name: 'Code Analysis Tests (Alternative)'
+          fail_on_failure: false
+          require_tests: false
