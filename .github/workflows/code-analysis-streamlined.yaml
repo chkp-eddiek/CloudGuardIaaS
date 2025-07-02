@@ -24,10 +24,10 @@ jobs:
             command: pytest --flakes ./
             parser: pytest-json
             continue-on-error: false
-            
-          - name: pydocstyle
+              - name: pydocstyle
             setup: |
-              pip install pytest pytest-docstyle pytest-json-report            command: pytest --docstyle --docstyle-select=D101,D102,D103,D105,D106,D207,D208,D209,D210,D211,D213,D214,D215,D300,D414,D417,D418,D419 ./
+              pip install pytest pytest-docstyle pytest-json-report
+            command: pytest --docstyle --docstyle-select=D101,D102,D103,D105,D106,D207,D208,D209,D210,D211,D213,D214,D215,D300,D414,D417,D418,D419 ./
             parser: pytest-json
             continue-on-error: true
             
@@ -50,15 +50,14 @@ jobs:
       - uses: ./.github/actions/generic-test-runner
         with:
           test-name: ${{ matrix.name }}
-          setup-commands: ${{ matrix.setup }}
-          test-command: ${{ matrix.command }}
+          setup-commands: ${{ matrix.setup }}          test-command: ${{ matrix.command }}
           output-parser: ${{ matrix.parser }}
           continue-on-error: ${{ matrix.continue-on-error }}
+
   publish-test-results:
     runs-on: ubuntu-latest
     needs: [code-analysis]
-    if: always()
-    steps:
+    if: always()    steps:
       - name: Download all test results
         uses: actions/download-artifact@v4
         with:
@@ -67,7 +66,8 @@ jobs:
       - name: Publish test results
         uses: EnricoMi/publish-unit-test-result-action@v2
         if: always()
-        with:          files: test-results/**/*.xml
+        with:
+          files: test-results/**/*.xml
           check_name: Code Analysis Tests
           comment_title: Code Analysis Test Results
           fail_on: nothing
