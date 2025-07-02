@@ -1,0 +1,76 @@
+name: Code Analysis (Streamlined)
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  code-analysis:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: pycodestyle
+            setup: |
+              pip install pytest pytest-pycodestyle pytest-json-report
+            command: pytest --pycodestyle --ignore=E721,E121,E123,E126,E133,E226,E241,E242,E704,W503,W504 --max-line-length=125 ./
+            parser: pytest-json
+            continue-on-error: false
+            
+          - name: pyflakes
+            setup: |
+              pip install pytest pytest-flakes pytest-json-report
+            command: pytest --flakes ./
+            parser: pytest-json
+            continue-on-error: false
+            
+          - name: pydocstyle
+            setup: |
+              pip install pytest pytest-docstyle pytest-json-report
+            command: pytest --docstyle --docstyle-select=D101,D102,D103,D105,D106,D207,D208,D209,D210,D211,D213,D214,D215,D300,D414,D417,D418,D419 ./
+            parser: pytest-json
+            continue-on-error: true
+            
+          - name: shellcheck
+            setup: |
+              sudo apt-get update && sudo apt-get install -y shellcheck
+            command: find . -type f -iname "*.sh" -exec shellcheck -e SC1091 '{}' +
+            parser: generic
+            continue-on-error: false
+
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        if: contains(matrix.name, 'py')
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+          
+      - uses: ./.github/actions/generic-test-runner
+        with:
+          test-name: ${{ matrix.name }}
+          setup-commands: ${{ matrix.setup }}
+          test-command: ${{ matrix.command }}
+          output-parser: ${{ matrix.parser }}
+          continue-on-error: ${{ matrix.continue-on-error }}
+
+  publish-test-results:
+    runs-on: ubuntu-latest
+    needs: [code-analysis]
+    if: always()
+    steps:
+      - name: Download all test results
+        uses: actions/download-artifact@v4
+        with:
+          path: test-results
+          
+      - name: Publish test results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Code Analysis Tests
+          path: 'test-results/**/*.xml'
+          reporter: java-junit
+          fail-on-error: false

@@ -1,0 +1,78 @@
+name: 'Shellcheck with JUnit'
+description: 'Run shellcheck and generate JUnit reports'
+inputs:
+  shellcheck-args:
+    description: 'Additional shellcheck arguments'
+    required: false
+    default: '-e SC1091'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install shellcheck and xmlstarlet
+      shell: bash
+      run: sudo apt-get update && sudo apt-get install -y shellcheck xmlstarlet
+      
+    - name: Run shellcheck with JUnit output
+      shell: bash
+      run: |
+        mkdir -p test-results
+        
+        # Create initial JUnit XML structure
+        cat > test-results/shellcheck-junit.xml << 'EOF'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <testsuites>
+          <testsuite name="shellcheck" tests="0" failures="0" errors="0">
+          </testsuite>
+        </testsuites>
+        EOF
+        
+        # Find all shell scripts and run shellcheck
+        total_files=0
+        failures=0
+        
+        while IFS= read -r -d '' file; do
+          total_files=$((total_files + 1))
+          echo "Checking $file"
+          
+          if ! shellcheck ${{ inputs.shellcheck-args }} "$file" > temp_output.txt 2>&1; then
+            failures=$((failures + 1))
+            # Add failure to XML
+            error_msg=$(cat temp_output.txt | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')
+            xmlstarlet ed --inplace \
+              -s "/testsuites/testsuite" -t elem -n "testcase" \
+              -s "/testsuites/testsuite/testcase[last()]" -t attr -n "classname" -v "shellcheck" \
+              -s "/testsuites/testsuite/testcase[last()]" -t attr -n "name" -v "$file" \
+              -s "/testsuites/testsuite/testcase[last()]" -t elem -n "failure" \
+              -s "/testsuites/testsuite/testcase[last()]/failure" -t attr -n "message" -v "$error_msg" \
+              test-results/shellcheck-junit.xml
+          else
+            # Add success to XML
+            xmlstarlet ed --inplace \
+              -s "/testsuites/testsuite" -t elem -n "testcase" \
+              -s "/testsuites/testsuite/testcase[last()]" -t attr -n "classname" -v "shellcheck" \
+              -s "/testsuites/testsuite/testcase[last()]" -t attr -n "name" -v "$file" \
+              test-results/shellcheck-junit.xml
+          fi
+        done < <(find . -type f -iname "*.sh" -print0)
+        
+        # Update test counts
+        xmlstarlet ed --inplace \
+          -u "/testsuites/testsuite/@tests" -v "$total_files" \
+          -u "/testsuites/testsuite/@failures" -v "$failures" \
+          test-results/shellcheck-junit.xml
+        
+        rm -f temp_output.txt
+        
+        # Exit with failure if there were any shellcheck failures
+        if [ $failures -gt 0 ]; then
+          echo "Shellcheck found $failures files with issues out of $total_files total files"
+          exit 1
+        fi
+        
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: shellcheck-test-results
+        path: test-results/shellcheck-junit.xml

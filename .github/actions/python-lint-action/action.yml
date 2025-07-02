@@ -1,0 +1,78 @@
+name: 'Python Lint with JUnit'
+description: 'Run Python linting tools and generate JUnit reports'
+inputs:
+  tool-name:
+    description: 'Name of the linting tool (pycodestyle, pyflakes, pydocstyle)'
+    required: true
+  tool-package:
+    description: 'pytest plugin package name'
+    required: true
+  pytest-args:
+    description: 'Additional pytest arguments'
+    required: false
+    default: ''
+  continue-on-error:
+    description: 'Whether to continue on error'
+    required: false
+    default: 'false'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+        
+    - name: Install dependencies
+      shell: bash
+      run: pip install pytest pytest-json-report ${{ inputs.tool-package }}
+      
+    - name: Run ${{ inputs.tool-name }}
+      shell: bash
+      run: |
+        mkdir -p test-results
+        pytest ${{ inputs.pytest-args }} --json-report --json-report-file=test-results/${{ inputs.tool-name }}-report.json ./ || true
+        
+    - name: Convert to JUnit XML
+      shell: bash
+      run: |
+        python -c "
+        import json
+        import xml.etree.ElementTree as ET
+        from xml.dom import minidom
+        import sys
+        
+        try:
+            with open('test-results/${{ inputs.tool-name }}-report.json', 'r') as f:
+                data = json.load(f)
+        except FileNotFoundError:
+            # Create empty report if no file found
+            data = {'summary': {'total': 0, 'failed': 0}, 'tests': []}
+        
+        testsuites = ET.Element('testsuites')
+        testsuite = ET.SubElement(testsuites, 'testsuite')
+        testsuite.set('name', '${{ inputs.tool-name }}')
+        testsuite.set('tests', str(data.get('summary', {}).get('total', 0)))
+        testsuite.set('failures', str(data.get('summary', {}).get('failed', 0)))
+        testsuite.set('errors', '0')
+        
+        for test in data.get('tests', []):
+            testcase = ET.SubElement(testsuite, 'testcase')
+            testcase.set('classname', test.get('nodeid', '').split('::')[0] if '::' in test.get('nodeid', '') else '${{ inputs.tool-name }}')
+            testcase.set('name', test.get('nodeid', 'unknown'))
+            if test.get('outcome') == 'failed':
+                failure = ET.SubElement(testcase, 'failure')
+                failure.set('message', test.get('call', {}).get('longrepr', 'Test failed'))
+        
+        xml_str = minidom.parseString(ET.tostring(testsuites)).toprettyxml(indent='  ')
+        with open('test-results/${{ inputs.tool-name }}-junit.xml', 'w') as f:
+            f.write(xml_str)
+        "
+        
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: ${{ inputs.tool-name }}-test-results
+        path: test-results/${{ inputs.tool-name }}-junit.xml
