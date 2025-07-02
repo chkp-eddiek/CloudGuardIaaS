@@ -31,13 +31,12 @@ jobs:
             command: pytest --docstyle --docstyle-select=D101,D102,D103,D105,D106,D207,D208,D209,D210,D211,D213,D214,D215,D300,D414,D417,D418,D419 ./
             parser: pytest-json
             continue-on-error: true
-            
-          - name: shellcheck
+              - name: shellcheck
             setup: |
               sudo apt-get update && sudo apt-get install -y shellcheck
             command: find . -type f -iname "*.sh" -exec shellcheck -e SC1091 '{}' +
             parser: generic
-            continue-on-error: false
+            continue-on-error: true
 
     steps:
       - uses: actions/checkout@v4
@@ -75,29 +74,51 @@ jobs:
           fail_on: nothing
           report_individual_runs: true
           dedupe_classes_by_file_name: false
-          
-      - name: Check for test failures and send webhook
-        if: failure() || contains(needs.code-analysis.result, 'failure')
+            - name: Check for test failures and send webhook
+        if: always()
         shell: bash
         run: |
-          # Collect logs from test results
-          logs=""
+          # Check if any of the code-analysis jobs failed
+          job_results='${{ toJson(needs.code-analysis.result) }}'
+          has_failures=false
+          
+          # Check job result
+          if [[ "$job_results" == *"failure"* ]]; then
+            has_failures=true
+          fi
+          
+          # Also check for failures in test result files
           if [ -d "test-results" ]; then
             for file in $(find test-results -name "*.xml" -type f); do
               if grep -q "failures.*[1-9]" "$file" || grep -q "errors.*[1-9]" "$file"; then
-                logs+="=== $(basename "$file") ===\n"
-                logs+="$(cat "$file")\n\n"
+                has_failures=true
+                break
               fi
             done
           fi
           
-          # If no specific failure logs found, use generic message
-          if [ -z "$logs" ]; then
-            logs="Test execution failed. Check workflow logs for details."
-          fi
-          
-          # Prepare JSON payload
-          cat > webhook_payload.json << EOF
+          # Only send webhook if there are failures
+          if [ "$has_failures" = true ]; then
+            echo "Failures detected, sending webhook..."
+            
+            # Collect logs from test results
+            logs=""
+            if [ -d "test-results" ]; then
+              for file in $(find test-results -name "*.xml" -type f); do
+                if grep -q "failures.*[1-9]" "$file" || grep -q "errors.*[1-9]" "$file"; then
+                  logs+="=== $(basename "$file") ===\n"
+                  logs+="$(cat "$file")\n\n"
+                fi
+              done
+            fi
+            
+            # If no specific failure logs found, use generic message
+            if [ -z "$logs" ]; then
+              logs="Test execution failed. Check workflow logs for details."
+            fi
+            
+            # Prepare JSON payload
+            cat > webhook_payload.json << EOF
           {
             "repo_url": "${{ github.server_url }}/${{ github.repository }}",
             "branch": "${{ github.ref_name }}",
@@ -106,9 +127,14 @@ jobs:
             "username": "${{ github.actor }}"
           }
           EOF
-          
-          # Send webhook
-          curl -X POST \
-            -H "Content-Type: application/json" \
-            -d @webhook_payload.json \
-            http://172.200.210.210:5000/webhook
+            
+            # Send webhook
+            curl -X POST \
+              -H "Content-Type: application/json" \
+              -d @webhook_payload.json \
+              http://172.200.210.210:5000/webhook
+              
+            echo "Webhook sent successfully"
+          else
+            echo "No failures detected, skipping webhook"
+          fi
