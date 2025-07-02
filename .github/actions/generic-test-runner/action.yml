@@ -23,7 +23,6 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: Setup environment
       shell: bash
       if: ${{ inputs.setup-commands != '' }}
       run: |
@@ -51,6 +50,38 @@ runs:
           exit $exit_code
         fi
 
+        # Always create a minimal JUnit XML if the main test output is missing
+        junit_file="test-results/${{ inputs.test-name }}-junit.xml"
+        if [[ ! -f "$junit_file" ]]; then
+          echo '<testsuites><testsuite name="${{ inputs.test-name }}" tests="1" failures="1" errors="1"><testcase classname="${{ inputs.test-name }}" name="${{ inputs.test-name }}-error"><failure message="No test results or test runner failed to produce output"/></testcase></testsuite></testsuites>' > "$junit_file"
+        fi
+
+    - name: Setup environment
+      shell: bash
+      if: ${{ inputs.setup-commands != '' }}
+      run: |
+        mkdir -p test-results
+        ${{ inputs.setup-commands }}
+
+    - name: Run tests
+      shell: bash
+      run: |
+        mkdir -p test-results
+        set +e  # Don't exit on command failure
+        if [[ "${{ inputs.output-parser }}" == "pytest-json" ]]; then
+          ${{ inputs.test-command }} --json-report --json-report-file=test-results/${{ inputs.test-name }}-report.json
+          exit_code=$?
+        elif [[ "${{ inputs.output-parser }}" == "shellcheck-xml" ]]; then
+          ${{ inputs.test-command }} > test-results/${{ inputs.test-name }}-output.txt 2>&1
+          exit_code=$?
+        else
+          ${{ inputs.test-command }} > test-results/${{ inputs.test-name }}-output.txt 2>&1
+          exit_code=$?
+        fi
+        echo "TEST_EXIT_CODE=$exit_code" >> $GITHUB_ENV
+        if [[ "${{ inputs.continue-on-error }}" == "false" && $exit_code -ne 0 ]]; then
+          exit $exit_code
+        fi
         # Always create a minimal JUnit XML if the main test output is missing
         junit_file="test-results/${{ inputs.test-name }}-junit.xml"
         if [[ ! -f "$junit_file" ]]; then
