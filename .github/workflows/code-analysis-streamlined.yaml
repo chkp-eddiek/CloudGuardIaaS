@@ -4,8 +4,7 @@ on:
   push:
   pull_request:
 
-jobs:
-  code-analysis:
+jobs:  code-analysis:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -14,7 +13,7 @@ jobs:
           - name: pycodestyle
             setup: |
               pip install pytest pytest-pycodestyle pytest-json-report
-            command: pytest --pycodestyle --ignore=E721,E121,E123,E126,E133,E226,E241,E242,E704,W503,W504 --max-line-length=125 ./
+            command: pytest --pycodestyle ./
             parser: pytest-json
             continue-on-error: false
             

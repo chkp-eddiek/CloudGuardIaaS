@@ -13,7 +13,7 @@ jobs:
         with:
           tool-name: pycodestyle
           tool-package: pytest-pycodestyle
-          pytest-args: --pycodestyle --ignore=E721,E121,E123,E126,E133,E226,E241,E242,E704,W503,W504 --max-line-length=125
+          pytest-args: --pycodestyle
 
   pyflakes:
     runs-on: ubuntu-latest
