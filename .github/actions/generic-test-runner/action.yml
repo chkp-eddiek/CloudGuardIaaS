@@ -57,63 +57,70 @@ runs:
       shell: bash
       run: |
         python3 -c "
-        import json
-        import xml.etree.ElementTree as ET
-        from xml.dom import minidom
-        import os
-        import sys
-        
-        test_name = '${{ inputs.test-name }}'
-        parser_type = '${{ inputs.output-parser }}'
-        exit_code = int(os.environ.get('TEST_EXIT_CODE', '0'))
-        
-        testsuites = ET.Element('testsuites')
-        testsuite = ET.SubElement(testsuites, 'testsuite')
-        testsuite.set('name', test_name)
-        
-        if parser_type == 'pytest-json':
-            try:
-                with open(f'test-results/{test_name}-report.json', 'r') as f:
-                    data = json.load(f)
-                
-                testsuite.set('tests', str(data.get('summary', {}).get('total', 0)))
-                testsuite.set('failures', str(data.get('summary', {}).get('failed', 0)))
-                testsuite.set('errors', '0')
-                
-                for test in data.get('tests', []):
-                    testcase = ET.SubElement(testsuite, 'testcase')
-                    testcase.set('classname', test.get('nodeid', '').split('::')[0] if '::' in test.get('nodeid', '') else test_name)
-                    testcase.set('name', test.get('nodeid', 'unknown'))
-                    if test.get('outcome') == 'failed':
-                        failure = ET.SubElement(testcase, 'failure')
-                        failure.set('message', test.get('call', {}).get('longrepr', 'Test failed'))
-            except FileNotFoundError:
-                # Create empty report
-                testsuite.set('tests', '0')
-                testsuite.set('failures', '0')
-                testsuite.set('errors', '0')
-        else:
-            # Generic parser - treat as single test
-            testsuite.set('tests', '1')
-            testsuite.set('failures', '1' if exit_code != 0 else '0')
-            testsuite.set('errors', '0')
-            
+import json
+import xml.etree.ElementTree as ET
+from xml.dom import minidom
+import os
+import sys
+
+test_name = '${{ inputs.test-name }}'
+parser_type = '${{ inputs.output-parser }}'
+exit_code = int(os.environ.get('TEST_EXIT_CODE', '0'))
+
+testsuites = ET.Element('testsuites')
+testsuite = ET.SubElement(testsuites, 'testsuite')
+testsuite.set('name', test_name)
+
+def write_failure(message):
+    testsuite.set('tests', '1')
+    testsuite.set('failures', '1')
+    testsuite.set('errors', '0')
+    testcase = ET.SubElement(testsuite, 'testcase')
+    testcase.set('classname', test_name)
+    testcase.set('name', f'{test_name}-error')
+    failure = ET.SubElement(testcase, 'failure')
+    failure.set('message', message)
+
+if parser_type == 'pytest-json':
+    try:
+        with open(f'test-results/{test_name}-report.json', 'r') as f:
+            data = json.load(f)
+        testsuite.set('tests', str(data.get('summary', {}).get('total', 0)))
+        testsuite.set('failures', str(data.get('summary', {}).get('failed', 0)))
+        testsuite.set('errors', '0')
+        for test in data.get('tests', []):
             testcase = ET.SubElement(testsuite, 'testcase')
-            testcase.set('classname', test_name)
-            testcase.set('name', f'{test_name}-check')
-            
-            if exit_code != 0:
+            testcase.set('classname', test.get('nodeid', '').split('::')[0] if '::' in test.get('nodeid', '') else test_name)
+            testcase.set('name', test.get('nodeid', 'unknown'))
+            if test.get('outcome') == 'failed':
                 failure = ET.SubElement(testcase, 'failure')
-                try:
-                    with open(f'test-results/{test_name}-output.txt', 'r') as f:
-                        output = f.read()
-                    failure.set('message', output[:1000])  # Limit message length
-                except FileNotFoundError:
-                    failure.set('message', f'{test_name} failed with exit code {exit_code}')
-        
-        xml_str = minidom.parseString(ET.tostring(testsuites)).toprettyxml(indent='  ')
-        with open(f'test-results/{test_name}-junit.xml', 'w') as f:
-            f.write(xml_str)
+                failure.set('message', test.get('call', {}).get('longrepr', 'Test failed'))
+        # If no tests found, add a dummy failure if exit_code != 0
+        if int(testsuite.get('tests', '0')) == 0 and exit_code != 0:
+            write_failure(f'{test_name} failed to run or no tests collected (exit code {exit_code})')
+    except Exception as e:
+        # Always create a report, even if JSON is missing or invalid
+        write_failure(f'Could not generate report: {str(e)} (exit code {exit_code})')
+else:
+    # Generic parser - treat as single test
+    testsuite.set('tests', '1')
+    testsuite.set('failures', '1' if exit_code != 0 else '0')
+    testsuite.set('errors', '0')
+    testcase = ET.SubElement(testsuite, 'testcase')
+    testcase.set('classname', test_name)
+    testcase.set('name', f'{test_name}-check')
+    if exit_code != 0:
+        failure = ET.SubElement(testcase, 'failure')
+        try:
+            with open(f'test-results/{test_name}-output.txt', 'r') as f:
+                output = f.read()
+            failure.set('message', output[:1000])  # Limit message length
+        except FileNotFoundError:
+            failure.set('message', f'{test_name} failed with exit code {exit_code}')
+
+xml_str = minidom.parseString(ET.tostring(testsuites)).toprettyxml(indent='  ')
+with open(f'test-results/{test_name}-junit.xml', 'w') as f:
+    f.write(xml_str)
         "
         
     - name: Upload test results
