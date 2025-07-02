@@ -75,28 +75,12 @@ jobs:
           ls -la .git || echo "No .git directory found"
           
       - name: Publish test results
-        uses: dorny/test-reporter@v1.9.1
+        uses: EnricoMi/publish-unit-test-result-action@v2
         if: always()
-        continue-on-error: true
         with:
-          name: Code Analysis Tests
-          path: test-results/**/*.xml
-          reporter: java-junit
-          fail-on-error: false
-          path-replace-backslashes: false
-          list-suites: all
-          list-tests: all
-          max-annotations: 10
-          fail-on-empty: true
-          only-summary: false
-          token: ${{ secrets.GITHUB_TOKEN }}
-          working-directory: ${{ github.workspace }}
-          
-      - name: Alternative test results publication
-        if: failure()
-        uses: mikepenz/action-junit-report@v4
-        with:
-          report_paths: 'test-results/**/*.xml'
-          check_name: 'Code Analysis Tests (Alternative)'
-          fail_on_failure: false
-          require_tests: false
+          files: test-results/**/*.xml
+          check_name: Code Analysis Tests
+          comment_title: Code Analysis Test Results
+          fail_on: nothing
+          report_individual_runs: true
+          dedupe_classes_by_file_name: false
