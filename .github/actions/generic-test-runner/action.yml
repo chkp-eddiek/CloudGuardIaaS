@@ -30,7 +30,6 @@ runs:
         mkdir -p test-results
         ${{ inputs.setup-commands }}
         
-    - name: Run tests
       shell: bash
       run: |
         mkdir -p test-results
@@ -50,6 +49,12 @@ runs:
         
         if [[ "${{ inputs.continue-on-error }}" == "false" && $exit_code -ne 0 ]]; then
           exit $exit_code
+        fi
+
+        # Always create a minimal JUnit XML if the main test output is missing
+        junit_file="test-results/${{ inputs.test-name }}-junit.xml"
+        if [[ ! -f "$junit_file" ]]; then
+          echo '<testsuites><testsuite name="${{ inputs.test-name }}" tests="1" failures="1" errors="1"><testcase classname="${{ inputs.test-name }}" name="${{ inputs.test-name }}-error"><failure message="No test results or test runner failed to produce output"/></testcase></testsuite></testsuites>' > "$junit_file"
         fi
         
     - name: Convert to JUnit XML
