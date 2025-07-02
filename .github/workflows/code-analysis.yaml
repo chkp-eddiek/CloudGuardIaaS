@@ -1,10 +1,72 @@
-name: Secure Code Analysis
+name: Code Analysis
 
 on:
-  - push
-  - pull_request
+  push:
+  pull_request:
 
 jobs:
-  code-analysis:
-    uses: CheckPointSW/secure-code-workflow/.github/workflows/code-analysis.yml@latest
-    secrets: inherit
+  pycodestyle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+          
+      - name: Install pycodestyle
+        run: pip install pycodestyle
+        
+      - name: Run pycodestyle
+        run: |
+          PYCODESTYLE_PATHS=('./')
+          pycodestyle --ignore=E721,E121,E123,E126,E133,E226,E241,E242,E704,W503,W504 --max-line-length 125 ${PYCODESTYLE_PATHS[@]}
+
+  pyflakes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+          
+      - name: Install pyflakes
+        run: pip install pyflakes
+        
+      - name: Run pyflakes
+        run: |
+          PYFLAKES_PATHS=('./')
+          pyflakes ${PYFLAKES_PATHS[@]}
+
+  pydocstyle:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+          
+      - name: Install pydocstyle
+        run: pip install pydocstyle
+        
+      - name: Run pydocstyle
+        run: |
+          PYDOCSTYLE_PATHS=('./')
+          pydocstyle --select=D101,D102,D103,D105,D106,D207,D208,D209,D210,D211,D213,D214,D215,D300,D414,D417,D418,D419 ${PYDOCSTYLE_PATHS[@]}
+
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+        
+      - name: Run shellcheck
+        run: find . -type f -iname "*.sh" -exec shellcheck -e SC1091 '{}' +
