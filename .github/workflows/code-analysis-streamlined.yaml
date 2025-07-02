@@ -50,14 +50,16 @@ jobs:
       - uses: ./.github/actions/generic-test-runner
         with:
           test-name: ${{ matrix.name }}
-          setup-commands: ${{ matrix.setup }}          test-command: ${{ matrix.command }}
+          setup-commands: ${{ matrix.setup }}
+          test-command: ${{ matrix.command }}
           output-parser: ${{ matrix.parser }}
           continue-on-error: ${{ matrix.continue-on-error }}
 
   publish-test-results:
     runs-on: ubuntu-latest
     needs: [code-analysis]
-    if: always()    steps:
+    if: always()
+    steps:
       - name: Download all test results
         uses: actions/download-artifact@v4
         with:
