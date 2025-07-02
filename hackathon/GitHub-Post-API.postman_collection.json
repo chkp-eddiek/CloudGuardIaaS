@@ -1,0 +1,38 @@
+{
+  "info": {
+    "name": "GitHub POST API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "cgns-hackathon-github-post-api"
+  },
+  "item": [
+    {
+      "name": "POST /api/github",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"path\": \"C:/path/to/repo\",\n    \"project_name\": \"my_project\",\n    \"user_name\": \"my_username\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:5000/api/github",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "5000",
+          "path": [
+            "api",
+            "github"
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}
