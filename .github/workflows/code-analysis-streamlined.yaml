@@ -67,14 +67,14 @@ jobs:
       - name: Publish test results
         uses: EnricoMi/publish-unit-test-result-action@v2
         if: always()
-        with:
-          files: test-results/**/*.xml
+        with:          files: test-results/**/*.xml
           check_name: Code Analysis Tests
           comment_title: Code Analysis Test Results
           fail_on: nothing
           report_individual_runs: true
           dedupe_classes_by_file_name: false
-            - name: Check for test failures and send webhook
+          
+      - name: Check for test failures and send webhook
         if: always()
         shell: bash
         run: |
